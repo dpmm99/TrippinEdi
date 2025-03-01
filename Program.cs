@@ -190,7 +190,7 @@ internal static class Program
         var interests = dbContext.Interests.Select(i => i.Name).ToList();
         var dislikes = dbContext.Dislikes.Select(d => d.Name).ToList();
         var pastDiscoveries = dbContext.PastDiscoveries.Select(pd => pd.CompactedText ?? pd.Text)
-            .Concat(dbContext.PendingDiscoveries.Select(pd => pd.Text)).ToList();
+            .Concat(dbContext.PendingDiscoveries.Select(pd => pd.Text)).ToArray();
 
         Console.WriteLine(_discoveryService.GetInferPrompt(interests, dislikes, pastDiscoveries));
     }
@@ -210,12 +210,12 @@ internal static class Program
                 var interests = dbContext.Interests.Select(i => i.Name).ToList();
                 var dislikes = dbContext.Dislikes.Select(d => d.Name).ToList();
                 var pastDiscoveries = dbContext.PastDiscoveries.Select(pd => pd.CompactedText ?? pd.Text)
-                    .Concat(dbContext.PendingDiscoveries.Select(pd => pd.Text)); //Include full text of pending discoveries if generating ahead (there would be none if not generating ahead, so same code)
+                    .Concat(dbContext.PendingDiscoveries.Select(pd => pd.Text)).ToArray(); //Include full text of pending discoveries if generating ahead (there would be none if not generating ahead, so same code)
 
                 output.WriteLine("\nGenerating new facts...");
-                var newDiscoveries = await _discoveryService.InferAsync(interests, dislikes, pastDiscoveries.ToList(), _temperature, output);
+                var newDiscoveries = await _discoveryService.InferAsync(interests, dislikes, pastDiscoveries, _temperature, output);
                 output.WriteLine("\nEvaluating generated facts...");
-                var evaluated = await _discoveryService.EvaluateAsync(dislikes, pastDiscoveries.ToList(), newDiscoveries, output);
+                var evaluated = (await _discoveryService.EvaluateAsync(dislikes, pastDiscoveries, newDiscoveries, output)).ToList();
 
                 if (evaluated.Count > 0)
                 {
@@ -273,7 +273,7 @@ internal static class Program
     {
         var pending = dbContext.PendingDiscoveries.Select(pd => pd.Text).ToList();
         var dislikes = dbContext.Dislikes.Select(d => d.Name).ToList();
-        var pastDiscoveries = dbContext.PastDiscoveries.Select(pd => pd.CompactedText ?? pd.Text).ToList();
+        var pastDiscoveries = dbContext.PastDiscoveries.Select(pd => pd.CompactedText ?? pd.Text).ToArray();
 
         var evaluated = await _discoveryService.EvaluateAsync(dislikes, pastDiscoveries, pending, new OutputHandler());
 
@@ -300,7 +300,7 @@ internal static class Program
         var pastDiscoveries = dbContext.PastDiscoveries.Where(p => p.CompactedText == null).ToList();
         foreach (var group in pastDiscoveries.Chunk(20))
         {
-            var lines = await _discoveryService.CompactAsync([.. group.Select(p => p.Text)], output);
+            var lines = (await _discoveryService.CompactAsync([.. group.Select(p => p.Text)], output)).ToList();
             //Note: it's entirely possible that the compacting fails or misses some lines. LLMs just don't always answer well. Not much we can do about it.
             for (var i = 0; i < group.Length && i < lines.Count; i++)
             {

@@ -71,22 +71,24 @@ public class DiscoveryService : IDiscoveryService
         Given the above list of past discoveries (until </PastDiscoveries>), which should be one fact per line, provide a shortened version of each, also one per line. The shortened version should be just 2-5 words that capture the essence of the fact for similarity comparison purposes. The goal is to minimize the amount of text when asking for discoveries not in this list later on. Do not acknowledge the prompt or write a conclusion; write only the shortened facts, in the same order that they were given.
         """;
 
-    public string GetInferPrompt(List<string> interests, List<string> dislikes, List<string> pastDiscoveries)
+    public string GetInferPrompt(IEnumerable<string> interests, IEnumerable<string> dislikes, string[] pastDiscoveries)
     {
+        Random.Shared.Shuffle(pastDiscoveries);
         return _factGenerationTemplate.Replace("{interests}", string.Join("\n", interests))
             .Replace("{dislikes}", string.Join("\n", dislikes))
             .Replace("{pastdiscoveries}", string.Join("\n", pastDiscoveries));
     }
 
-    public async Task<List<string>> InferAsync(List<string> interests, List<string> dislikes, List<string> pastDiscoveries, float temperature, OutputHandler output)
+    public async Task<IEnumerable<string>> InferAsync(IEnumerable<string> interests, IEnumerable<string> dislikes, string[] pastDiscoveries, float temperature, OutputHandler output)
     {
         var prompt = GetInferPrompt(interests, dislikes, pastDiscoveries);
 
         return await InferLinesAsync(prompt, temperature, output);
     }
 
-    public async Task<List<string>> EvaluateAsync(List<string> dislikes, List<string> pastDiscoveries, List<string> pendingDiscoveries, OutputHandler output)
+    public async Task<IEnumerable<string>> EvaluateAsync(IEnumerable<string> dislikes, string[] pastDiscoveries, IEnumerable<string> pendingDiscoveries, OutputHandler output)
     {
+        Random.Shared.Shuffle(pastDiscoveries);
         var prompt = _evaluationTemplate.Replace("{dislikes}", string.Join("\n", dislikes))
             .Replace("{pastdiscoveries}", string.Join("\n", pastDiscoveries))
             .Replace("{pendingdiscoveries}", string.Join("\n", pendingDiscoveries));
@@ -94,7 +96,7 @@ public class DiscoveryService : IDiscoveryService
         return await InferLinesAsync(prompt, 0, output);
     }
 
-    public async Task<List<string>> CompactAsync(List<string> pastDiscoveries, OutputHandler output)
+    public async Task<IEnumerable<string>> CompactAsync(IEnumerable<string> pastDiscoveries, OutputHandler output)
     {
         var prompt = _compactingTemplate.Replace("{pastdiscoveries}", string.Join("\n", pastDiscoveries));
         return await InferLinesAsync(prompt, 0, output);

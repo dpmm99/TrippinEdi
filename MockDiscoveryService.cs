@@ -2,12 +2,12 @@
 
 public class MockDiscoveryService : IDiscoveryService
 {
-    public string GetInferPrompt(List<string> interests, List<string> dislikes, List<string> pastDiscoveries)
+    public string GetInferPrompt(IEnumerable<string> interests, IEnumerable<string> dislikes, string[] pastDiscoveries)
     {
         return "MockDiscoveryService has no prompt.";
     }
 
-    public async Task<List<string>> InferAsync(List<string> interests, List<string> dislikes, List<string> pastDiscoveries, float temperature, OutputHandler output)
+    public async Task<IEnumerable<string>> InferAsync(IEnumerable<string> interests, IEnumerable<string> dislikes, string[] pastDiscoveries, float temperature, OutputHandler output)
     {
         // Simulate an async call to an external service
         await Task.Delay(1000);
@@ -30,14 +30,14 @@ public class MockDiscoveryService : IDiscoveryService
             ];
     }
 
-    public async Task<List<string>> EvaluateAsync(List<string> dislikes, List<string> pastDiscoveries, List<string> pendingDiscoveries, OutputHandler output)
+    public async Task<IEnumerable<string>> EvaluateAsync(IEnumerable<string> dislikes, string[] pastDiscoveries, IEnumerable<string> pendingDiscoveries, OutputHandler output)
     {
         // Simulate evaluation
         await Task.Delay(1000);
         return pendingDiscoveries.Where(p => !pastDiscoveries.Any(d => p.Contains(d))).ToList();
     }
 
-    public async Task<List<string>> CompactAsync(List<string> pastDiscoveries, OutputHandler output)
+    public async Task<IEnumerable<string>> CompactAsync(IEnumerable<string> pastDiscoveries, OutputHandler output)
     {
         // Simulate compaction
         await Task.Delay(1000);
