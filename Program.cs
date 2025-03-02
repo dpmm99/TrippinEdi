@@ -214,8 +214,12 @@ internal static class Program
 
                 output.WriteLine("\nGenerating new facts...");
                 var newDiscoveries = await _discoveryService.InferAsync(interests, dislikes, pastDiscoveries, _temperature, output);
-                output.WriteLine("\nEvaluating generated facts...");
-                var evaluated = (await _discoveryService.EvaluateAsync(dislikes, pastDiscoveries, newDiscoveries, output)).ToList();
+                var evaluated = new List<string>();
+                if (newDiscoveries.Any())
+                {
+                    output.WriteLine("\nEvaluating generated facts...");
+                    evaluated.AddRange(await _discoveryService.EvaluateAsync(dislikes, pastDiscoveries, newDiscoveries, output));
+                }
 
                 if (evaluated.Count > 0)
                 {

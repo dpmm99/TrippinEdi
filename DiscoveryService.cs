@@ -1,9 +1,9 @@
-﻿#define UseInteractExecutor
+﻿// #define UseInteractExecutor //Simpler to use and handles context shifting, but currently crashes at random roughly once every 2-4 responses
 using LLama;
 using LLama.Common;
 using LLama.Native;
 using System.Diagnostics.CodeAnalysis;
-#if UseInteractExecutor //Simpler to use and handles context shifting, but currently crashes at random roughly once every 2-4 responses
+#if UseInteractExecutor
 using System.Text;
 using System.Text.RegularExpressions;
 #endif
@@ -16,50 +16,74 @@ public class DiscoveryService : IDiscoveryService
     private ModelParams? _modelParameters;
 
     private const string _factGenerationTemplate = """
-        User's interests:
+        # User's interests:
         {interests}
 
-        User dislikes:
+        # User dislikes:
         {dislikes}
 
-        Already gave facts about:
+        # Already gave facts about:
         {pastdiscoveries}
 
-        Examples of what NOT to write:
+        # Examples of what NOT to write:
         Too broad: Pixel art often involves a limited color palette and small sizes.
         Too broad and not a statement: Creating a physics-based camera system for smooth 2D tracking.
         Too common-knowledge: You can greatly optimize code for older/embedded systems via bitwise operations.
         Too common-knowledge: Older/embedded systems necessitate optimized memory usage.
         Not a fact: Implementing specific memory allocation strategies for real-time rendering in games.
         
-        Example of a good complete response (except it should be longer):
+        # Example of a good complete response (except it should be longer):
         While a square root operation takes dozens to hundreds of CPU cycles, Doom has a very fast square root estimate function.
         You can use a priority heap for efficient A* pathfinding.
         Procedural music systems using Markov chains can generate endless variations of background music.
 
-        Instructions:
-        List a bunch of somewhat niche, very specific facts (topics) within the user's areas of interest in the form of statements. Exclude any content related to their dislikes. Exclude anything vaguely related to facts they were already given. Focus on specific techniques, practical applications, and lesser-known but highly relevant aspects of these fields. Provide concrete examples, one-line explanations, or real-world applications that can be directly applied to enhance skills or projects in these areas. Avoid overly broad facts or obscure niches that are irrelevant to the specified interests. Just provide one fact per line, no titles, no **bold**. The user has deep familiarity with all the listed topics. The goal is to give the user more new facts and concepts that are interesting to learn about--NOT to dance around the same topics.
-        Provide 30 responses meeting these criteria; they don't have to cover every listed interest. After considering each response, state to yourself in one word whether it meets the specificity/nicheness requirements. And make doubly sure they are really specific statements and are not repeats. You can think all you need up front, as long as the thinking appears between <think> and </think>.
-        You may first think through sub-topics within the user's interests so that you DO NOT mention similar facts to any of the above!
+        # Goal:
+        We must give the user more new facts and concepts that are interesting to learn about--NOT to dance around the same topics.
+        
+        # Instructions:
+        List a bunch of somewhat niche, very specific facts (topics) within the user's areas of interest in the form of statements.
+        Exclude any content related to their dislikes.
+        Exclude anything vaguely related to facts they were already given.
+        Focus on specific techniques, practical applications, and lesser-known but highly relevant aspects of these fields.
+        Provide concrete examples, one-line explanations, or real-world applications that can be directly applied to enhance skills or projects in these areas.
+        Avoid overly broad facts or obscure niches that are irrelevant to the specified interests.
+        Provide 30 responses meeting these criteria; they don't have to cover every listed interest.
+        After considering each response, state to yourself in one word whether it meets the specificity/nicheness requirements.
+        And make doubly sure they are really specific statements and are not repeats--they also cannot be more details about the same past facts.
+        If you start to talk about one of the facts already given above, cut yourself off promptly and try a different angle.
+        You should start by thinking step-by-step out loud about sub-topics within the user's interests so that you DO NOT mention similar facts to any of the above.
+        Conclude your thoughts with </think> before giving the final answers.
+        Just provide one fact per line in your final output after </think>, no titles, no **bold**.
         """;
 
     private const string _evaluationTemplate = """
-        User dislikes:
+        <UserDislikes>
         {dislikes}
-
+        </UserDislikes>
+        
         Already gave the user facts about:
+        <PastDiscoveries>
         {pastdiscoveries}
+        </PastDiscoveries>
         
         The pending discoveries to evaluate:
         <PendingDiscoveries>
         {pendingdiscoveries}
         </PendingDiscoveries>
         
-        Example fact: Quadtree spatial partitioning can reduce physics collision checks from O(n^2) to O(n log n) in 2D games.
+        Example good output fact: Quadtree spatial partitioning can reduce physics collision checks from O(n^2) to O(n log n) in 2D games.
 
         Instructions:
-        Evaluate each pending discovery (facts about the user's topics of interest, between the PendingDiscoveries XML tags) to ensure it is relevant to the user's interests and sufficiently different from facts already given to the user, indicated above. Provide no facts that are even close to the same as past discoveries or as each other, e.g., no facts about the same algorithm, approach, or event. In the final response, simply repeat each pending discovery that is sufficiently distant from all the facts already given to the user AND sufficiently distant from their dislikes. Do not acknowledge the prompt and do not write a conclusion; your output must be exactly one line per acceptable pending discovery, or it will break the program you support. If there are no good pending discoveries, simply don't respond.
-        However, if any of them are just a topic with no real information, instead of repeating it as-is, provide a specific detail of the topic itself (e.g., "Using specific data structures for efficient pathfinding" -> "You can use a priority heap for efficient A* pathfinding"). Ensure the resulting facts are meaningful information, in statement form, that the user can easily search for and find more detailed results about. You can think all you need up front, as long as the thinking appears between <think> and </think>.
+        Facts about the user's topics of interest are given between the PendingDiscoveries XML tags above.
+        Evaluate each of these to ensure it is relevant to the user's interests and sufficiently different from facts already given to the user, which are provided between the PastDiscoveries XML tags above.
+        Do not provide facts that are even close to the same as any of the past discoveries or as each other, e.g., no facts about the same algorithm, approach, or event.
+        In the final response, simply repeat each pending discovery that is sufficiently distant from all the facts already given to the user AND sufficiently distant from their dislikes. Repeat just one per line.
+        However, if any of them are just a topic with no real information, instead of repeating it as-is, provide a specific detail of the topic itself (e.g., "Using specific data structures for efficient pathfinding" -> "You can use a priority heap for efficient A* pathfinding"). But do not give more specific facts in place of ones that already meet my criteria.
+        Ensure the resulting facts are meaningful information, in statement form, that the user can easily search for and find more detailed results about.
+        You should start by thinking step-by-step out loud about the validity of each potential fact.
+        Conclude your thoughts with </think> before giving the final list of acceptable results.
+        Do not acknowledge the prompt and do not write a conclusion; your output after </think> must be exactly one line per acceptable pending discovery, or it will break the program you support.
+        If there are no good pending discoveries, simply don't respond.
         """;
 
     private const string _compactingTemplate = """
@@ -68,7 +92,11 @@ public class DiscoveryService : IDiscoveryService
         </PastDiscoveries>
         
         Instructions:
-        Given the above list of past discoveries (until </PastDiscoveries>), which should be one fact per line, provide a shortened version of each, also one per line. The shortened version should be just 2-5 words that capture the essence of the fact for similarity comparison purposes. The goal is to minimize the amount of text when asking for discoveries not in this list later on. Do not acknowledge the prompt or write a conclusion; write only the shortened facts, in the same order that they were given.
+        Given the above list of past discoveries (until </PastDiscoveries>), which should be one fact per line, provide a shortened version of each, also one per line.
+        The shortened version should be just 2-5 words that capture the essence of the fact for similarity comparison purposes.
+        The goal is to minimize the amount of text when asking for discoveries not in this list later on.
+        Think it through step-by-step out loud before giving the final answers, and conclude your thoughts with </think>.
+        After </think>, do not acknowledge the prompt or write a conclusion; write only the shortened facts, in the same order that they were given.
         """;
 
     public string GetInferPrompt(IEnumerable<string> interests, IEnumerable<string> dislikes, string[] pastDiscoveries)
@@ -115,8 +143,9 @@ public class DiscoveryService : IDiscoveryService
         //Get the biggest GGUF in the current directory and use that. If there is none, then revert to my FuseO1 at a fixed path.
         var ggufs = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.gguf", SearchOption.TopDirectoryOnly);
         Array.Sort(ggufs, (a, b) => new FileInfo(b).Length.CompareTo(new FileInfo(a).Length));
+        var modelPath = ggufs.FirstOrDefault() ?? @"C:\AI\FuseO1-DeekSeekR1-QwQ-SkyT1-32B-Preview-Q4_K_M.gguf";
 
-        _modelParameters = new ModelParams(ggufs.FirstOrDefault() ?? @"C:\AI\FuseO1-DeekSeekR1-QwQ-SkyT1-32B-Preview-Q4_K_M.gguf")
+        _modelParameters = new ModelParams(modelPath)
         {
             ContextSize = 8192, //TODO: would be great if we could load just the vocab and calculate the context size needed. 4096 + 32 * past discoveries would be a decent context size guess, but it has to increase the more the user uses the program.
             GpuLayerCount = 99, //Just as many as it can handle
@@ -126,6 +155,9 @@ public class DiscoveryService : IDiscoveryService
             BatchSize = 2048, //TODO: Experimenting with batch sizes to see if that pertains to the crash
             UBatchSize = 2048,
         };
+
+        if (new FileInfo(modelPath).Length > 1024L * 1024 * 1024 * 20) _modelParameters.GpuLayerCount = 25; //If it's a huge model, don't try to load it all into VRAM. Bad, but rough estimate, just for my own computer, for Llama 3.
+
         _model = LLamaWeights.LoadFromFile(_modelParameters);
         NativeLogConfig.llama_log_set(new FileLogger("llamacpp_log.txt")); //I'm told you have to set it again after loading the model in order to catch a crash reason.
     }
@@ -164,7 +196,7 @@ public class DiscoveryService : IDiscoveryService
             await foreach (var text in executor.InferAsync(prompt, inferenceParams, default))
             {
                 if (!thinking && text == "</think>") break; //I saw it get stuck in a loop once where it kept doing what I asked but then ending with </think> and repeating.
-                if (currentResult.Length > 5 && currentResult.Length < 20 && (currentResult.ToString(0, 6) == "</Past" || currentResult.ToString(0, 6) == "</Pend")) //It also keeps ending with </PastDiscoveries> and then either repeating that several times or looping when I ask it for shortened text.
+                if (currentResult.Length < 20 && (currentResult.StartsWith("</Past") || currentResult.StartsWith("</Pend"))) //It also keeps ending with </PastDiscoveries> and then either repeating that several times or looping when I ask it for shortened text.
                 {
                     currentResult.Clear();
                     thinking = false;
@@ -212,7 +244,18 @@ public class DiscoveryService : IDiscoveryService
         return results;
 #else
         var service = new BatchedInferenceService(_model, _modelParameters, temperature, output);
-        return await service.InferAsync(prompt);
+        return await service.InferAsync(prompt, [
+            (thinking, results, currentResult, text) => !thinking && results.Count >= 30 && results[^1].StartsWith("30"), //Stop immediately after fact 30 if the model numbers them and is done thinking.
+            (thinking, results, currentResult, text) => { //Don't let it start a conclusion since we don't need it.
+                if (!thinking && results.Count >= 30 && currentResult.Length < 15 && (currentResult.StartsWith("Each fact") || currentResult.StartsWith("Each of these")
+                    || currentResult.StartsWith("These ") || currentResult.StartsWith("The above")))
+                {
+                    currentResult.Clear();
+                    return true;
+                }
+                return false;
+            }
+        ]);
 #endif
     }
 

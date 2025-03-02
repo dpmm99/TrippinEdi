@@ -10,6 +10,7 @@ namespace TrippinEdi;
 internal class DistributionSamplingPipelineThatStops(LLamaWeights model, float temperature) : BaseSamplingPipeline
 {
     private readonly StopTokenCatcher _stopTokenCatcher = new(model);
+    private readonly TokenBanner _tokenBanner = new(model);
 
     public bool StopTokenReceived => _stopTokenCatcher.StopTokenReceived;
 
@@ -40,6 +41,44 @@ internal class DistributionSamplingPipelineThatStops(LLamaWeights model, float t
         }
     }
 
+    private class TokenBanner(LLamaWeights model) : ICustomSampler
+    {
+        public readonly Dictionary<LLamaToken, int> bannedTokens = [];
+
+        public string Name => nameof(TokenBanner);
+
+        public void Accept(LLamaToken token)
+        {
+        }
+
+        public void Apply(ref LLamaTokenDataArrayNative tokenData)
+        {
+            if (bannedTokens.Count == 0) return; //Short-circuit
+
+            for (var i = 0; i < tokenData.Data.Length; i++)
+            {
+                if (bannedTokens.TryGetValue(tokenData.Data[i].ID, out int banDuration))
+                {
+                    tokenData.Data[i].Logit = float.NegativeInfinity;
+                    if (--banDuration <= 0) bannedTokens.Remove(tokenData.Data[i].ID);
+                    else bannedTokens[tokenData.Data[i].ID] = banDuration;
+                    tokenData.Sorted = false;
+                }
+            }
+        }
+
+        public ICustomSampler Clone() => new TokenBanner(model);
+
+        public void Dispose()
+        {
+        }
+
+        public void Reset()
+        {
+            bannedTokens.Clear();
+        }
+    }
+
     public Grammar? Grammar { get; init; }
 
     protected override SafeLLamaSamplerChainHandle CreateChain(SafeLLamaContextHandle context)
@@ -50,6 +89,7 @@ internal class DistributionSamplingPipelineThatStops(LLamaWeights model, float t
             chain.AddGrammar(context.ModelHandle, Grammar.Gbnf, Grammar.Root);
         }
 
+        chain.AddCustom(_tokenBanner);
         if (temperature > 0)
         {
             chain.AddTopK(40);
@@ -67,5 +107,10 @@ internal class DistributionSamplingPipelineThatStops(LLamaWeights model, float t
 
         chain.AddCustom(_stopTokenCatcher);
         return chain;
+    }
+
+    public void BanToken(LLamaToken token, int banDuration = 1)
+    {
+        _tokenBanner.bannedTokens[token] = banDuration;
     }
 }
