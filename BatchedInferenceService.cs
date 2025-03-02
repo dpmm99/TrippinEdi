@@ -129,17 +129,18 @@ public class BatchedInferenceService
                     //The model I tested with isn't smart enough to understand the "no titles or numbering" instruction, so remove numbering.
                     if (currentResultLines.Length >= 1)
                     {
-                        var line = numberStartRegex.Replace(currentResultLines[0], "");
+                        var line = numberStartRegex.Replace(currentResultLines[0], "").Trim();
 
                         //Inject some extra text to try to fix the loop if we've already seen this line. Models like to get stuck in a loop and waste time.
-                        if (results.Contains(line))
+                        if (results.Contains(line)) //Note: can screw with the thinking when it's saying the same thing about different facts.
                         {
                             var loopBreaker = _loopBreakers[Random.Shared.Next(_loopBreakers.Length)];
                             conversation.Prompt(_model.Tokenize(text.Split("\n")[0].TrimEnd('.') + loopBreaker, false, false, Encoding.UTF8));
                             _output.Write("-- Model started repeating itself; injected text to try to stop it --\n", ConsoleColor.DarkGray);
 
-                            //Temporarily ban that first token competely in the sampler //TODO: Optimally, we would ban the most important word(s), too.
-                            sampler.BanToken(_model.Tokenize(line, false, false, Encoding.UTF8)[0], banDuration: 6);
+                            //Temporarily ban the first few tokens competely in the sampler //TODO: Optimally, we would ban the most important word(s), too.
+                            var lineTokens = _model.Tokenize(line, false, false, Encoding.UTF8);
+                            for (var i = 0; i < 4 && i < lineTokens.Length; i++) sampler.BanToken(lineTokens[i], banDuration: 6 + i);
 
                             continue;
                         }
