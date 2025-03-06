@@ -47,8 +47,8 @@ public class BatchedInferenceService
         var templatedPrompt = Encoding.UTF8.GetString(template.Apply());
 
         // Set up the conversation
-        using var conversation = _executor.Create();
-        using var sampler = new DistributionSamplingPipelineThatStops(_model, _temperature);
+        var conversation = _executor.Create();
+        var sampler = new DistributionSamplingPipelineThatStops(_model, _temperature);
 
         // Initialize response tracking
         var results = new List<string>();
@@ -56,7 +56,7 @@ public class BatchedInferenceService
 
         // Initial prompt
         conversation.Prompt(_executor.Context.Tokenize(templatedPrompt, addBos: true, special: true)
-            .Concat(_executor.Context.Tokenize("<think>\rOkay, ", false, true)).ToArray()); // Force thinking
+            .Concat(_executor.Context.Tokenize("<think>\nOkay, ", false, true)).ToArray()); // Force thinking
         var thinking = true;
         var firstIteration = true;
 
@@ -132,7 +132,7 @@ public class BatchedInferenceService
                         var line = numberStartRegex.Replace(currentResultLines[0], "").Trim();
 
                         //Inject some extra text to try to fix the loop if we've already seen this line. Models like to get stuck in a loop and waste time.
-                        if (results.Contains(line)) //Note: can screw with the thinking when it's saying the same thing about different facts.
+                        if (results.TakeLast(5).Contains(line)) //Note: can screw with the thinking when it's saying the same thing about different facts.
                         {
                             var loopBreaker = _loopBreakers[Random.Shared.Next(_loopBreakers.Length)];
                             conversation.Prompt(_model.Tokenize(text.Split("\n")[0].TrimEnd('.') + loopBreaker, false, false, Encoding.UTF8));
