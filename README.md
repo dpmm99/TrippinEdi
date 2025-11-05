@@ -41,6 +41,12 @@ Trippin' Edi produced these facts:
   - To work around this, you can delete or move the database, re-open the program, and enter different interests and dislikes, e.g., more specifc ones.
 - There's a high likelihood of getting introductory/conclusion sentences, as the model is not trained to generate standalone facts. Leaving these in the database can lead to worse results.
   - These can be removed manually via any tool that allows you to modify a SQLite database, such as [SQLiteStudio](https://sqlitestudio.pl/).
+- There's potential for a large performance improvement by generating multiple responses concurrently or using speculative decoding, but this is not implemented.
+  - Concurrent response generation is likely to lead to more duplication, too, but if you're clever, maybe you could make it less likely...say, by using each of the top 16 logits from the first output pass to fork 16 conversations, or maybe by checking after each token and banning uncommon tokens if they appear in the other concurrent conversations already.
+  - Speculative decoding is not difficult to implement (see [ModelFreeSpeculation](https://github.com/dpmm99/ModelFreeSpeculation)), but it requires additional memory and doesn't always lead to a speed improvement. I think it's less likely to be helpful in this program simply because the request is for coming up with "random" topics rather than a chain of thought.
+- Not all "thinking"/"reasoning" models are supported.
+  - Different thinking models use different tokens to indicate the start (possibly no token) and end of the reasoning.
+  - The GGUF does not directly indicate what the model puts before and after the thinking. The best I could do is hard-code a list of known thinking start/end tokens and try tokenizing each to see if the model treats it as a single token, and that also isn't perfect due to models like GPT-OSS-120B using several tokens like `<|start|>assistant<|channel|>analysis<|message|>`.
 
 ## Requirements
 
@@ -82,7 +88,9 @@ Trippin' Edi produced these facts:
 The application uses [LLamaSharp](https://github.com/SciSharp/LLamaSharp) as a wrapper for [llama.cpp](https://github.com/ggerganov/llama.cpp). It defaults to NVIDIA® CUDA® 12 inference if supported on your hardware. To use different backend packages:
 1. Install the desired LLamaSharp.Backend.* NuGet package
 2. You can either uninstall the other Backend packages or specify whether to enable/disable each backend via LLamaSharp's NativeLibraryConfig, e.g., `NativeLibraryConfig.All.WithCuda(enable: false).WithVulkan(enable: true)`
-3. Modify `DiscoveryService.cs` model parameters as needed
+3. You can pull a copy of the LLamaSharp repository and toggle the boolean in Directory.Build.props to use a project reference instead of NuGet package references, but then you *must* use NativeLibraryConfig to specify the backend if you don't want it to default to CUDA (when supported).
+	- Note: The project file tries looking for the LLamaSharp project in a few directories, but the solution can't have conditions like that, so just add your local LLamaSharp project to the solution if needed.
+4. Modify `DiscoveryService.cs` model parameters as needed
 
 ### Database
 - Uses SQLite with Entity Framework Core

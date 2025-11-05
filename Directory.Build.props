@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Set to true to prefer a local LLamaSharp checkout; set to false to force package references.
+         You can override per-machine or per-user (e.g., msbuild /p:UseLocalLLamaSharp=true). -->
+    <UseLocalLLamaSharp Condition="'$(UseLocalLLamaSharp)'==''">false</UseLocalLLamaSharp>
+  </PropertyGroup>
+</Project>

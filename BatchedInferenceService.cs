@@ -47,8 +47,8 @@ public class BatchedInferenceService
         var templatedPrompt = Encoding.UTF8.GetString(template.Apply());
 
         // Set up the conversation
-        var conversation = _executor.Create();
-        var sampler = new DistributionSamplingPipelineThatStops(_model, _temperature);
+        using var conversation = _executor.Create();
+        using var sampler = new DistributionSamplingPipelineThatStops(_model, _temperature);
 
         // Initialize response tracking
         var results = new List<string>();

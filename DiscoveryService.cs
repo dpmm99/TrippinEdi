@@ -143,11 +143,11 @@ public class DiscoveryService : IDiscoveryService
         //Get the biggest GGUF in the current directory and use that. If there is none, then revert to my FuseO1 at a fixed path.
         var ggufs = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.gguf", SearchOption.TopDirectoryOnly);
         Array.Sort(ggufs, (a, b) => new FileInfo(b).Length.CompareTo(new FileInfo(a).Length));
-        var modelPath = ggufs.FirstOrDefault() ?? @"C:\AI\FuseO1-DeekSeekR1-QwQ-SkyT1-32B-Preview-Q4_K_M.gguf";
+        var modelPath = ggufs.FirstOrDefault() ?? @"C:\AI\Qwen3-32B-UD-Q5_K_XL.gguf";
 
         _modelParameters = new ModelParams(modelPath)
         {
-            ContextSize = 8192, //TODO: would be great if we could load just the vocab and calculate the context size needed. 4096 + 32 * past discoveries would be a decent context size guess, but it has to increase the more the user uses the program.
+            ContextSize = 12288, //TODO: would be great if we could load just the vocab and calculate the context size needed. 4096 + 32 * past discoveries would be a decent context size guess, but it has to increase the more the user uses the program.
             GpuLayerCount = 99, //Just as many as it can handle
             FlashAttention = true,
             TypeK = GGMLType.GGML_TYPE_Q8_0,
