@@ -107,7 +107,7 @@ The application uses [LLamaSharp](https://github.com/SciSharp/LLamaSharp) as a w
 
 ### Model Configuration
 Default settings in `DiscoveryService.cs`:
-- Context size: 8192 tokens
+- Context size: 12288 tokens
 - GPU layers: 99 (auto-reduces to 25 for models >20GB)
 - Flash attention: enabled
 - K/V cache: Q8_0 quantization
